@@ -46,3 +46,13 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid token")
     finally:
         db.close()
+
+def require_roles(*roles):
+    def wrapper(current_user: models.User = Depends(get_current_user)):
+        if current_user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operation not permitted"
+            )
+        return current_user
+    return wrapper
