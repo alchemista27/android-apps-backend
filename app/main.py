@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app import models, database
-from app.routes import users, auth
+from app.routes import users, auth, projects, materials
+from app.middleware.log_requests import LoggingMiddleware
 
 # Inisialisasi database
 models.Base.metadata.create_all(bind=database.engine)
