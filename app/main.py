@@ -26,25 +26,6 @@ app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(materials.router)
 
-# Global exception handler untuk memastikan semua error JSON
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-    )
-
-# fallback generic exception
-@app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    # tetap log error
-    from app.logger import logger
-    logger.exception(f"Unhandled exception: {str(exc)}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"},
-    )
-
 @app.get("/")
 def read_root():
     return {"message": "Welcome to PJBLMS Backend API 🚀"}

@@ -96,6 +96,9 @@ def list_projects(
         ).all()
         project_ids = [a.project_id for a in assignments]
         query = query.filter(models.Project.id.in_(project_ids))
+    elif current_user.role == "dosen":
+        query = query.filter(models.Project.owner_id == current_user.id)
+
 
     return query.offset(skip).limit(limit).all()
 
