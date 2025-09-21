@@ -3,6 +3,11 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app import database, models
 from app.auth import create_access_token
+from app.tests.utils import create_user
+
+# jangan lagi panggil User langsung pakai password
+admin = create_user(db_session, "admin@test.com", "adminpass", "admin")
+
 
 client = TestClient(app)
 

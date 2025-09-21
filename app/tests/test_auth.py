@@ -2,6 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app import database, models, auth
+from app.tests.utils import create_user
+from app.database import SessionLocal, Base, engine
+
+# jangan lagi panggil User langsung pakai password
+admin = create_user(db_session, "admin@test.com", "adminpass", "admin")
 
 client = TestClient(app)
 
