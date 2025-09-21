@@ -37,13 +37,13 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
         user = db.query(models.User).filter(models.User.email == email).first()
         if user is None:
-            raise HTTPException(status_code=401, detail="User not found")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
         return user
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
     finally:
         db.close()
 
@@ -52,7 +52,7 @@ def require_roles(*roles):
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Operation not permitted"
+                detail="Forbidden"   # BUKAN "Forbidden"
             )
         return current_user
     return wrapper

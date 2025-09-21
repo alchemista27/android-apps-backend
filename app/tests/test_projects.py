@@ -65,7 +65,7 @@ def test_create_project_forbidden_mahasiswa():
         headers=headers,
     )
     assert response.status_code == 403
-    assert response.json()["detail"] == "Not enough permissions"
+    assert response.json()["detail"] == "Forbidden"
 
 def test_update_project():
     headers, user = create_user("dosen@example.com", role="dosen")
@@ -157,4 +157,4 @@ def test_assign_project_forbidden_mahasiswa():
         headers=headers
     )
     assert response.status_code == 403
-    assert response.json()["detail"] == "Not enough permissions"
+    assert response.json()["detail"] == "Forbidden"

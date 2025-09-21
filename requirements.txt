@@ -7,3 +7,5 @@ python-jose[cryptography]
 passlib[bcrypt]
 pydantic[email]
 pytest
+pytest-asyncio
+httpx

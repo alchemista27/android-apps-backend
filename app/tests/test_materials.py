@@ -78,7 +78,7 @@ def test_create_material_forbidden_mahasiswa():
         headers=headers
     )
     assert response.status_code == 403
-    assert response.json()["detail"] == "Not enough permissions"
+    assert response.json()["detail"] == "Forbidden"
 
 def test_update_material():
     headers, user = create_user("dosen@example.com", role="dosen")

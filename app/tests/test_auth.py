@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app import database, models, security
+from app import database, models, auth
 
 client = TestClient(app)
 
@@ -112,7 +112,7 @@ def create_user(email="user@example.com", password="password123", role="mahasisw
     user = models.User(
         email=email,
         full_name="Test User",
-        hashed_password=security.get_password_hash(password),
+        hashed_password=auth.hash_password(password),
         role=role,
     )
     db.add(user)

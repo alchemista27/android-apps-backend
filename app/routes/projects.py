@@ -100,7 +100,7 @@ def assign_project(
         project_id=assign.project_id
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Project already assigned")
+        raise HTTPException(status_code=400, detail="Project already assigned to this student")
 
     assignment = models.ProjectAssignment(user_id=assign.user_id, project_id=assign.project_id)
     db.add(assignment)

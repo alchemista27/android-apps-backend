@@ -29,49 +29,40 @@ def get_db():
 # --- Register ---
 @router.post("/register", response_model=schemas.UserResponse)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    try:
-        existing_user = db.query(models.User).filter(models.User.email == user.email).first()
-        if existing_user:
-            logger.warning(f"Gagal register: email {user.email} sudah terdaftar")
-            raise HTTPException(status_code=400, detail="Email sudah terdaftar")
+    existing_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if existing_user:
+        logger.warning(f"Gagal register: email {user.email} sudah terdaftar")
+        raise HTTPException(status_code=400, detail="Email sudah terdaftar")
 
-        hashed_password = auth.hash_password(user.password)
-        new_user = models.User(
-            email=user.email,
-            hashed_password=hashed_password,
-            full_name=user.full_name
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
+    hashed_password = auth.hash_password(user.password)
+    new_user = models.User(
+        email=user.email,
+        hashed_password=hashed_password,
+        full_name=user.full_name
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
 
-        logger.info(f"User baru terdaftar: id={new_user.id}, email={new_user.email}")
-        return new_user
+    logger.info(f"User baru terdaftar: id={new_user.id}, email={new_user.email}")
+    return new_user
 
-    except Exception as e:
-        logger.exception(f"Exception saat register user {user.email}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 # --- Login ---
 @router.post("/login")
-def login(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    try:
-        db_user = db.query(models.User).filter(models.User.email == user.email).first()
-        if not db_user:
-            logger.warning(f"Gagal login: email {user.email} tidak ditemukan")
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if not db_user:
+        logger.warning(f"Gagal login: email {user.email} tidak ditemukan")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not auth.verify_password(user.password, db_user.hashed_password):
-            logger.warning(f"Gagal login: password salah untuk email {user.email}")
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not auth.verify_password(user.password, db_user.hashed_password):
+        logger.warning(f"Gagal login: password salah untuk email {user.email}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        token = auth.create_access_token({"sub": db_user.email})
-        logger.info(f"User login sukses: id={db_user.id}, email={db_user.email}")
-        return {"access_token": token, "token_type": "bearer"}
-
-    except Exception as e:
-        logger.exception(f"Exception saat login user {user.email}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    token = auth.create_access_token({"sub": db_user.email})
+    logger.info(f"User login sukses: id={db_user.id}, email={db_user.email}")
+    return {"access_token": token, "token_type": "bearer"}
 
 # --- Get Current User ---
 def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -97,3 +88,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
     finally:
         db.close()
+
+@router.get("/me", response_model=schemas.UserResponse)
+def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user

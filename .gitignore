@@ -1,3 +1,4 @@
 venv/
 alembic/
+logs/
 alembic.ini

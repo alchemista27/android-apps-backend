@@ -1,5 +1,6 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime, func, Text, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 class User(Base):
@@ -12,6 +13,10 @@ class User(Base):
     role = Column(String, default="mahasiswa")  # admin/dosen/mahasiswa
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # relationship ke projects yang dimiliki
+    projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
+    assignments = relationship("ProjectAssignment", back_populates="user", cascade="all, delete-orphan")
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -20,6 +25,15 @@ class Project(Base):
     description = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     owner_id = Column(Integer, ForeignKey("users.id"))  # siapa yang buat project
+
+    # relasi ke User
+    owner = relationship("User", back_populates="projects")
+
+    # relasi ke Material
+    materials = relationship("Material", back_populates="project", cascade="all, delete-orphan")
+
+    # relasi ke Assignment
+    assignments = relationship("ProjectAssignment", back_populates="project", cascade="all, delete-orphan")
 
 class Material(Base):
     __tablename__ = "materials"
