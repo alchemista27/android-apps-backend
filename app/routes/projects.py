@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime
 from app import models, schemas, database, auth
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -66,6 +67,9 @@ def list_projects(
     skip: int = 0,
     limit: int = Query(default=10, lte=50),
     owner_id: Optional[int] = None,
+    keyword: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -73,7 +77,19 @@ def list_projects(
 
     if owner_id:
         query = query.filter(models.Project.owner_id == owner_id)
+    
+    if keyword:
+        query = query.filter(
+            (models.Project.title.ilike(f"%{keyword}%")) |
+            (models.Project.description.ilike(f"%{keyword}%"))
+        )
 
+    if date_from:
+        query = query.filter(models.Project.created_at >= date_from)
+    if date_to:
+        query = query.filter(models.Project.created_at <= date_to)
+
+    # Mahasiswa hanya boleh lihat project yang dia assign
     if current_user.role == "mahasiswa":
         assignments = db.query(models.ProjectAssignment).filter(
             models.ProjectAssignment.user_id == current_user.id

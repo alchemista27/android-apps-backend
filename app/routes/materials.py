@@ -84,6 +84,7 @@ def list_materials(
     if project_id:
         query = query.filter(models.Material.project_id == project_id)
 
+    # Mahasiswa hanya boleh lihat materi dari project yang dia assign
     if current_user.role == "mahasiswa":
         assignments = db.query(models.ProjectAssignment).filter(
             models.ProjectAssignment.user_id == current_user.id
