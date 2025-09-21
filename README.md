@@ -51,6 +51,7 @@ Backend API untuk sistem manajemen proyek dan materi pembelajaran berbasis role 
 ```bash
 git clone <repo-url>
 cd pjblms-backend
+```
 
 2. **Buat virtual environment & install dependencies**
 
@@ -59,22 +60,78 @@ python -m venv venv
 source venv/bin/activate   # Linux / macOS
 venv\Scripts\activate      # Windows
 pip install -r requirements.txt
+```
 
 3. **Jalankan database migration**
 
 ```bash
 python -m app.database
+```
 
 4. **Jalankan server FastAPI**
 
 ```bash
 uvicorn app.main:app --reload
+```
 
 5. **Buka Doc API**
 
 ```bash
 http://[IP_address]:8000/docs
+```
 
 ---
 
 ## Struktur Project
+```bash
+app/
+├── main.py            # Entry point FastAPI
+├── database.py        # SQLAlchemy engine & session
+├── models.py          # ORM models (User, Project, Material, Assignment)
+├── schemas.py         # Pydantic schemas
+├── auth.py            # JWT authentication, hashing, require_roles
+├── routes/
+│   ├── auth.py
+│   ├── users.py
+│   ├── projects.py
+│   └── materials.py
+├── middleware/
+│   ├── log_requests.py
+│   └── error_handler.py
+├── logger.py          # Logging setup
+└── tests/
+    ├── test_auth.py
+    ├── test_projects.py
+    ├── test_materials.py
+    ├── test_role_access.py
+    └── utils.py
+```
+
+---
+
+## Testing
+```bash
+pytest
+```
+* Semua API tests sudah pass ✅
+* Unit test, integration test, load test → belum tersedia
+
+---
+
+## Konfigurasi untuk Production
+* Gunakan **SECRET_KEY** & **DATABASE_URL** dari environment variable
+* Gunakan reverse proxy (Nginx / Caddy)
+* Gunakan process manager (e.g., Gunicorn, Uvicorn + Systemd / Supervisor)
+* Backup database & monitoring
+
+---
+
+## Catatan
+* Role-based GET list untuk Project & Material sudah diterapkan
+* Logging sudah ada, tapi JSON global error handler wajib digunakan
+* Frontend belum dibuat (Login/Register, Dashboard role-based, CRUD UI, token management)
+
+---
+
+## Kontributor
+Septian Jauhariansyah
