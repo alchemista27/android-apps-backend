@@ -52,14 +52,3 @@ class ProjectAssignResponse(ProjectAssign):
 
     class Config:
         orm_mode = True
-
-class ProjectCreate(BaseModel):
-    title: str
-    description: Optional[str]
-
-class ProjectResponse(ProjectCreate):
-    id: int
-    created_at: str
-
-    class Config:
-        orm_mode = True

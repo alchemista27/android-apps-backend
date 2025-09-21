@@ -7,8 +7,14 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="PJBLMS Backend")
 
+# Tambahkan middleware logging
+app.add_middleware(LoggingMiddleware)
+
+# Include routers
 app.include_router(users.router)
 app.include_router(auth.router) 
+app.include_router(projects.router)
+app.include_router(materials.router)
 
 @app.get("/")
 def read_root():
