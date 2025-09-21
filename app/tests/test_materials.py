@@ -1,16 +1,13 @@
+# app/tests/test_materials.py
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app import database, models
 from app.auth import create_access_token
-from app.tests.utils import create_user
-
-# jangan lagi panggil User langsung pakai password
-admin = create_user(db_session, "admin@test.com", "adminpass", "admin")
-
 
 client = TestClient(app)
 
+# ===== Fixture setup/teardown DB =====
 @pytest.fixture(autouse=True)
 def setup_db():
     db = database.SessionLocal()
@@ -29,12 +26,13 @@ def setup_db():
     db.commit()
     db.close()
 
-def create_user(email, role="admin"):
+# ===== Helper buat user/project/material =====
+def create_user_helper(email, role="admin"):
     db = database.SessionLocal()
     user = models.User(
         email=email,
+        full_name="Test User",
         hashed_password="fakehash",
-        full_name="Test",
         role=role
     )
     db.add(user)
@@ -44,7 +42,7 @@ def create_user(email, role="admin"):
     token = create_access_token({"sub": email})
     return {"Authorization": f"Bearer {token}"}, user
 
-def create_project(owner_id):
+def create_project_helper(owner_id):
     db = database.SessionLocal()
     project = models.Project(title="Test Proj", description="Desc", owner_id=owner_id)
     db.add(project)
@@ -53,17 +51,19 @@ def create_project(owner_id):
     db.close()
     return project
 
-def create_material(project_id, db):
+def create_material_helper(project_id):
+    db = database.SessionLocal()
     material = models.Material(title="Materi 1", content="Isi", project_id=project_id)
     db.add(material)
     db.commit()
     db.refresh(material)
+    db.close()
     return material
 
+# ===== Tests =====
 def test_create_material_admin():
-    headers, user = create_user("admin@example.com", role="admin")
-    project = create_project(owner_id=user.id)
-
+    headers, user = create_user_helper("admin@example.com", role="admin")
+    project = create_project_helper(user.id)
     response = client.post(
         "/materials/",
         json={"title": "Materi 1", "content": "Isi materi", "project_id": project.id},
@@ -74,9 +74,8 @@ def test_create_material_admin():
     assert data["title"] == "Materi 1"
 
 def test_create_material_forbidden_mahasiswa():
-    headers, user = create_user("stud@example.com", role="mahasiswa")
-    project = create_project(owner_id=user.id)
-
+    headers, user = create_user_helper("stud@example.com", role="mahasiswa")
+    project = create_project_helper(user.id)
     response = client.post(
         "/materials/",
         json={"title": "Materi Mahasiswa", "content": "Isi", "project_id": project.id},
@@ -86,13 +85,9 @@ def test_create_material_forbidden_mahasiswa():
     assert response.json()["detail"] == "Forbidden"
 
 def test_update_material():
-    headers, user = create_user("dosen@example.com", role="dosen")
-    project = create_project(owner_id=user.id)
-
-    db = database.SessionLocal()
-    material = create_material(project.id, db)
-    db.close()
-
+    headers, user = create_user_helper("dosen@example.com", role="dosen")
+    project = create_project_helper(user.id)
+    material = create_material_helper(project.id)
     response = client.put(
         f"/materials/{material.id}",
         json={"title": "Updated Materi", "content": "Updated Content", "project_id": project.id},
@@ -103,13 +98,9 @@ def test_update_material():
     assert data["title"] == "Updated Materi"
 
 def test_delete_material():
-    headers, user = create_user("admin2@example.com", role="admin")
-    project = create_project(owner_id=user.id)
-
-    db = database.SessionLocal()
-    material = create_material(project.id, db)
-    db.close()
-
+    headers, user = create_user_helper("admin2@example.com", role="admin")
+    project = create_project_helper(user.id)
+    material = create_material_helper(project.id)
     response = client.delete(f"/materials/{material.id}", headers=headers)
     assert response.status_code == 204
 

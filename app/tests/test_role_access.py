@@ -1,174 +1,140 @@
+# app/tests/test_role_access.py
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app import database, models
-from sqlalchemy.orm import Session
-from app.tests.utils import create_user
-
-# jangan lagi panggil User langsung pakai password
-admin = create_user(db_session, "admin@test.com", "adminpass", "admin")
-
+from app.auth import create_access_token
 
 client = TestClient(app)
 
-# --- Fixture DB session ---
-@pytest.fixture()
-def db_session():
-    db: Session = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# ===== Fixture setup/teardown DB =====
+@pytest.fixture(autouse=True)
+def setup_db():
+    db = database.SessionLocal()
+    db.query(models.ProjectAssignment).delete()
+    db.query(models.Material).delete()
+    db.query(models.Project).delete()
+    db.query(models.User).delete()
+    db.commit()
+    db.close()
+    yield
+    db = database.SessionLocal()
+    db.query(models.ProjectAssignment).delete()
+    db.query(models.Material).delete()
+    db.query(models.Project).delete()
+    db.query(models.User).delete()
+    db.commit()
+    db.close()
 
-# --- Helper: buat user & login ---
-def create_user(db, email, password, role):
-    user = models.User(email=email, password=password, role=role)
+# ===== Helper buat user/project/material =====
+def create_user_helper(email, role="mahasiswa"):
+    db = database.SessionLocal()
+    user = models.User(
+        email=email,
+        full_name="Test User",
+        hashed_password="fakehash",
+        role=role
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    db.close()
+    token = create_access_token({"sub": email})
+    return {"Authorization": f"Bearer {token}"}, user
 
-def get_token(email, password):
-    response = client.post("/auth/login", json={"email": email, "password": password})
-    return response.json()["access_token"]
+def create_project_helper(owner_id):
+    db = database.SessionLocal()
+    project = models.Project(title="Project Test", description="Desc", owner_id=owner_id)
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    db.close()
+    return project
 
-# ------------------ TESTS ------------------
+def create_material_helper(project_id):
+    db = database.SessionLocal()
+    material = models.Material(title="Material Test", content="Content", project_id=project_id)
+    db.add(material)
+    db.commit()
+    db.refresh(material)
+    db.close()
+    return material
 
-def test_mahasiswa_cannot_see_unassigned_projects(db_session):
-    # Buat admin & mahasiswa
-    admin = create_user(db_session, "admin2@test.com", "adminpass", "admin")
-    mahasiswa = create_user(db_session, "mhs2@test.com", "mhs123", "mahasiswa")
+# ===== TEST PROJECT ACCESS =====
+def test_mahasiswa_cannot_see_unassigned_projects():
+    headers_admin, admin = create_user_helper("admin2@test.com", "admin")
+    headers_mhs, mahasiswa = create_user_helper("mhs2@test.com", "mahasiswa")
+    project = create_project_helper(admin.id)
 
-    # Buat project assign ke admin saja
-    project = models.Project(title="Admin Project", description="Desc", owner_id=admin.id)
-    db_session.add(project)
-    db_session.commit()
-    db_session.refresh(project)
-
-    token = get_token(mahasiswa.email, "mhs123")
-
-    # Mahasiswa request list projects
-    response = client.get("/projects/", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/projects/", headers=headers_mhs)
     projects = response.json()
-
-    # Mahasiswa tidak boleh lihat project milik admin
     assert all(p["id"] != project.id for p in projects)
 
+def test_mahasiswa_sees_assigned_projects():
+    headers_admin, admin = create_user_helper("admin3@test.com", "admin")
+    headers_mhs, mahasiswa = create_user_helper("mhs3@test.com", "mahasiswa")
+    project = create_project_helper(admin.id)
 
-def test_mahasiswa_sees_assigned_projects(db_session):
-    # Buat admin & mahasiswa
-    admin = create_user(db_session, "admin3@test.com", "adminpass", "admin")
-    mahasiswa = create_user(db_session, "mhs3@test.com", "mhs123", "mahasiswa")
-
-    # Buat project assign ke mahasiswa
-    project = models.Project(title="Assigned Project", description="Desc", owner_id=admin.id)
-    db_session.add(project)
-    db_session.commit()
-    db_session.refresh(project)
-
-    # Assign project ke mahasiswa
+    # assign project
+    db = database.SessionLocal()
     assignment = models.ProjectAssignment(user_id=mahasiswa.id, project_id=project.id)
-    db_session.add(assignment)
-    db_session.commit()
+    db.add(assignment)
+    db.commit()
+    db.close()
 
-    token = get_token(mahasiswa.email, "mhs123")
-
-    response = client.get("/projects/", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/projects/", headers=headers_mhs)
     projects = response.json()
-
     assert any(p["id"] == project.id for p in projects)
 
+def test_admin_sees_all_projects():
+    headers_admin, admin = create_user_helper("admin4@test.com", "admin")
+    headers_mhs, _ = create_user_helper("mhs4@test.com", "mahasiswa")
+    p1 = create_project_helper(admin.id)
+    p2 = create_project_helper(admin.id)
 
-def test_admin_sees_all_projects(db_session):
-    admin = create_user(db_session, "admin4@test.com", "adminpass", "admin")
-    mahasiswa = create_user(db_session, "mhs4@test.com", "mhs123", "mahasiswa")
-
-    # Buat beberapa project
-    p1 = models.Project(title="Project 1", description="Desc", owner_id=admin.id)
-    p2 = models.Project(title="Project 2", description="Desc", owner_id=admin.id)
-    db_session.add_all([p1, p2])
-    db_session.commit()
-
-    token = get_token(admin.email, "adminpass")
-    response = client.get("/projects/", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/projects/", headers=headers_admin)
     projects = response.json()
-
     assert len(projects) >= 2
-    assert any(p["title"] == "Project 1" for p in projects)
-    assert any(p["title"] == "Project 2" for p in projects)
+    assert any(p["id"] == p1.id for p in projects)
+    assert any(p["id"] == p2.id for p in projects)
 
-# ------------------ MATERIALS ------------------
+# ===== TEST MATERIAL ACCESS =====
+def test_mahasiswa_cannot_see_unassigned_materials():
+    headers_admin, admin = create_user_helper("admin_mat@test.com", "admin")
+    headers_mhs, mahasiswa = create_user_helper("mhs_mat@test.com", "mahasiswa")
+    project = create_project_helper(admin.id)
+    material = create_material_helper(project.id)
 
-def test_mahasiswa_cannot_see_unassigned_materials(db_session):
-    # Buat admin & mahasiswa
-    admin = create_user(db_session, "admin_mat@test.com", "adminpass", "admin")
-    mahasiswa = create_user(db_session, "mhs_mat@test.com", "mhs123", "mahasiswa")
-
-    # Buat project & material
-    project = models.Project(title="Admin Project", description="Desc", owner_id=admin.id)
-    db_session.add(project)
-    db_session.commit()
-    db_session.refresh(project)
-
-    material = models.Material(title="Admin Material", content="Content", project_id=project.id)
-    db_session.add(material)
-    db_session.commit()
-    db_session.refresh(material)
-
-    token = get_token(mahasiswa.email, "mhs123")
-    response = client.get("/materials/", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/materials/", headers=headers_mhs)
     materials = response.json()
-
-    # Mahasiswa tidak boleh lihat material project yang tidak di-assign
     assert all(m["id"] != material.id for m in materials)
 
+def test_mahasiswa_sees_assigned_materials():
+    headers_admin, admin = create_user_helper("admin_mat2@test.com", "admin")
+    headers_mhs, mahasiswa = create_user_helper("mhs_mat2@test.com", "mahasiswa")
+    project = create_project_helper(admin.id)
+    material = create_material_helper(project.id)
 
-def test_mahasiswa_sees_assigned_materials(db_session):
-    # Buat admin & mahasiswa
-    admin = create_user(db_session, "admin_mat2@test.com", "adminpass", "admin")
-    mahasiswa = create_user(db_session, "mhs_mat2@test.com", "mhs123", "mahasiswa")
-
-    # Buat project & material
-    project = models.Project(title="Assigned Project", description="Desc", owner_id=admin.id)
-    db_session.add(project)
-    db_session.commit()
-    db_session.refresh(project)
-
-    material = models.Material(title="Assigned Material", content="Content", project_id=project.id)
-    db_session.add(material)
-    db_session.commit()
-    db_session.refresh(material)
-
-    # Assign project ke mahasiswa
+    # assign project
+    db = database.SessionLocal()
     assignment = models.ProjectAssignment(user_id=mahasiswa.id, project_id=project.id)
-    db_session.add(assignment)
-    db_session.commit()
+    db.add(assignment)
+    db.commit()
+    db.close()
 
-    token = get_token(mahasiswa.email, "mhs123")
-    response = client.get("/materials/", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/materials/", headers=headers_mhs)
     materials = response.json()
-
     assert any(m["id"] == material.id for m in materials)
 
+def test_admin_sees_all_materials():
+    headers_admin, admin = create_user_helper("admin_mat3@test.com", "admin")
+    p1 = create_project_helper(admin.id)
+    p2 = create_project_helper(admin.id)
+    m1 = create_material_helper(p1.id)
+    m2 = create_material_helper(p2.id)
 
-def test_admin_sees_all_materials(db_session):
-    admin = create_user(db_session, "admin_mat3@test.com", "adminpass", "admin")
-    
-    # Buat beberapa project & material
-    p1 = models.Project(title="Project 1", description="Desc", owner_id=admin.id)
-    p2 = models.Project(title="Project 2", description="Desc", owner_id=admin.id)
-    db_session.add_all([p1, p2])
-    db_session.commit()
-
-    m1 = models.Material(title="Material 1", content="Content", project_id=p1.id)
-    m2 = models.Material(title="Material 2", content="Content", project_id=p2.id)
-    db_session.add_all([m1, m2])
-    db_session.commit()
-
-    token = get_token(admin.email, "adminpass")
-    response = client.get("/materials/", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/materials/", headers=headers_admin)
     materials = response.json()
-
     assert len(materials) >= 2
-    assert any(m["title"] == "Material 1" for m in materials)
-    assert any(m["title"] == "Material 2" for m in materials)
+    assert any(m["id"] == m1.id for m in materials)
+    assert any(m["id"] == m2.id for m in materials)

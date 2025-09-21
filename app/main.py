@@ -16,7 +16,7 @@ app = FastAPI(title="PJBLMS Backend")
 app.add_middleware(LoggingMiddleware)
 
 # Registrasi global exception handler
-app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
