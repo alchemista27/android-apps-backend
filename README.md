@@ -51,3 +51,31 @@ Backend API untuk sistem manajemen proyek dan materi pembelajaran berbasis role 
 ```bash
 git clone <repo-url>
 cd pjblms-backend
+
+2. **Buat virtual environment & install dependencies**
+
+```bash
+python -m venv venv
+source venv/bin/activate   # Linux / macOS
+venv\Scripts\activate      # Windows
+pip install -r requirements.txt
+
+3. **Jalankan database migration**
+
+```bash
+python -m app.database
+
+4. **Jalankan server FastAPI**
+
+```bash
+uvicorn app.main:app --reload
+
+5. **Buka Doc API**
+
+```bash
+http://[IP_address]:8000/docs
+
+---
+
+## Struktur Project
+
