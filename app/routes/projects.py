@@ -65,3 +65,59 @@ def assign_project(assign: schemas.ProjectAssign,
     db.commit()
     db.refresh(assignment)
     return assignment
+
+# --- Create Project (Admin/Dosen only) ---
+@router.post("/", response_model=schemas.ProjectResponse)
+def create_project(project: schemas.ProjectCreate,
+                   current_user: models.User = Depends(auth.require_roles("admin", "dosen")),
+                   db: Session = Depends(get_db)):
+    new_project = models.Project(
+        title=project.title,
+        description=project.description
+    )
+    db.add(new_project)
+    db.commit()
+    db.refresh(new_project)
+    return new_project
+
+# --- Update Project (Admin/Dosen only) ---
+@router.put("/{project_id}", response_model=schemas.ProjectResponse)
+def update_project(project_id: int, project: schemas.ProjectCreate,
+                   current_user: models.User = Depends(auth.require_roles("admin", "dosen")),
+                   db: Session = Depends(get_db)):
+    existing_project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not existing_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    existing_project.title = project.title
+    existing_project.description = project.description
+    db.commit()
+    db.refresh(existing_project)
+    return existing_project
+
+# --- Delete Project (Admin/Dosen only) ---
+@router.delete("/{project_id}", status_code=204)
+def delete_project(project_id: int,
+                   current_user: models.User = Depends(auth.require_roles("admin", "dosen")),
+                   db: Session = Depends(get_db)):
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    db.delete(project)
+    db.commit()
+    return
+
+# --- Read Projects (All users, filtered by role) ---
+@router.get("/", response_model=list[schemas.ProjectResponse])
+def list_projects(current_user: models.User = Depends(auth.get_current_user),
+                  db: Session = Depends(get_db)):
+    if current_user.role == "mahasiswa":
+        # Mahasiswa hanya dapat melihat project yang di-assign
+        assignments = db.query(models.ProjectAssignment).filter(
+            models.ProjectAssignment.user_id == current_user.id
+        ).all()
+        project_ids = [a.project_id for a in assignments]
+        projects = db.query(models.Project).filter(models.Project.id.in_(project_ids)).all()
+    else:
+        # Admin / Dosen bisa lihat semua project
+        projects = db.query(models.Project).all()
+    return projects
