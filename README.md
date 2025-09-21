@@ -78,4 +78,3 @@ http://[IP_address]:8000/docs
 ---
 
 ## Struktur Project
-
