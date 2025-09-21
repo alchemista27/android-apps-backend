@@ -92,3 +92,69 @@ def test_delete_project():
     deleted = db.query(models.Project).filter_by(id=project.id).first()
     db.close()
     assert deleted is None
+
+# --- TEST ASSIGN PROJECT ---
+
+def test_assign_project_success():
+    headers, admin = create_user("adminassign@example.com", role="admin")
+    _, mahasiswa = create_user("studentassign@example.com", role="mahasiswa")
+
+    project = create_project(owner_id=admin.id)
+
+    response = client.post(
+        "/projects/assign",
+        json={"user_id": mahasiswa.id, "project_id": project.id},
+        headers=headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user_id"] == mahasiswa.id
+    assert data["project_id"] == project.id
+
+def test_assign_project_duplicate():
+    headers, admin = create_user("admindup@example.com", role="admin")
+    _, mahasiswa = create_user("studentdup@example.com", role="mahasiswa")
+
+    project = create_project(owner_id=admin.id)
+
+    # assign pertama kali
+    client.post(
+        "/projects/assign",
+        json={"user_id": mahasiswa.id, "project_id": project.id},
+        headers=headers
+    )
+    # assign kedua kali harus gagal
+    response = client.post(
+        "/projects/assign",
+        json={"user_id": mahasiswa.id, "project_id": project.id},
+        headers=headers
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Project already assigned to this student"
+
+def test_assign_project_not_found():
+    headers, admin = create_user("adminnf@example.com", role="admin")
+    _, mahasiswa = create_user("studentnf@example.com", role="mahasiswa")
+
+    # project id 999 pasti tidak ada
+    response = client.post(
+        "/projects/assign",
+        json={"user_id": mahasiswa.id, "project_id": 999},
+        headers=headers
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "User or Project not found"
+
+def test_assign_project_forbidden_mahasiswa():
+    headers, mahasiswa = create_user("mahasiswaassign@example.com", role="mahasiswa")
+    _, target = create_user("studenttarget@example.com", role="mahasiswa")
+
+    project = create_project(owner_id=mahasiswa.id)
+
+    response = client.post(
+        "/projects/assign",
+        json={"user_id": target.id, "project_id": project.id},
+        headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not enough permissions"
